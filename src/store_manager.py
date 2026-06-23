@@ -3,6 +3,7 @@ Order manager application
 SPDX - License - Identifier: LGPL - 3.0 - or -later
 Auteurs : Gabriel C. Ullmann, Fabio Petrillo, 2025
 """
+import time
 import threading
 from graphene import Schema
 from stocks.schemas.query import Query
@@ -123,6 +124,12 @@ def graphql_supplier():
 def put_orders():
     """Update one or more order fields"""
     return update_order(request)
+
+@app.get('/test/slow/<int:delay_seconds>')
+def test_slow_endpoint(delay_seconds):
+    """Endpoint pour tester les timeouts"""
+    time.sleep(delay_seconds)
+    return {"message": f"Response after {delay_seconds} seconds"}, 200
 
 @app.route("/metrics")
 def metrics():
