@@ -251,17 +251,34 @@ Dans le navigateur, l'utilisateur ne reçoit donc **pas** le message « Response
 
 **Exemple pratique :** si le service de paiement devenait très lent (ex. surcharge), un appel `POST /payments` sans timeout bloquerait la création de commandes côté Store Manager. Avec un timeout de 5 s, le Store Manager échoue vite, peut journaliser l'incident et répondre à l'utilisateur, au lieu de rester figé.
 
-<!-- TODO : insérer les captures du navigateur pour /slow/2 (OK) et /slow/10 (erreur après 5s) -->
+---
+
+## Activité 7 — Test de charge sur la création de commande
+
+Test de charge réalisé avec Locust sur la création de commande (`POST /orders`), avec **50 utilisateurs** (spawn rate 5/s) pendant **60 secondes**. Deux scénarios ont été comparés : à travers l'API Gateway KrakenD (rate limit actif) et directement sur le backend `store_manager` (sans rate limit).
+
+| Métrique | Via KrakenD (rate limit 200/min) | Direct `store_manager` (sans limite) |
+|---|---|---|
+| Requêtes totales | 1404 | 1303 |
+| Échecs (HTTP 503) | 1200 (85,5 %) | 0 (0 %) |
+| Débit | 23,5 req/s | 21,8 req/s |
+| Temps médian | 1 ms | 94 ms |
+| p95 | 54 ms | 610 ms |
+| Temps max | 117 ms | 1016 ms |
+
+**Observations sur les performances :**
+
+- **À travers la gateway :** environ **85 % des requêtes sont rejetées** avec un statut **HTTP 503**, très rapidement (~1 ms), car KrakenD applique le rate limit dès que le seuil de 200 requêtes/minute est dépassé. Seules ~200 commandes par minute parviennent réellement au backend. Le rate limiting joue donc son rôle de protection : le backend n'est jamais saturé, au prix du rejet des requêtes excédentaires.
+
+- **Directement sur le backend :** **toutes les requêtes réussissent** (0 % d'échec), mais la latence réelle de création d'une commande est bien plus élevée et **augmente avec la charge** : médiane à 94 ms, p95 à 610 ms et un maximum à ~1 s. Cela reflète le coût réel du traitement (requêtes SQL, mise à jour du stock, synchronisation Redis, appel au service de paiement) et un début de saturation lorsque 50 utilisateurs sollicitent le service simultanément.
+
+**Conclusion :** sans protection, le Store Manager absorbe toute la charge mais voit ses temps de réponse se dégrader fortement. Avec le rate limiting de KrakenD en façade, le backend reste rapide et stable, la gateway absorbant et rejetant le surplus de trafic — un compromis essentiel pour préserver la disponibilité du service en cas de pic ou d'attaque (DDoS).
+
+<!-- TODO (optionnel) : insérer une capture Locust (Charts / Statistics) de ton propre test de charge -->
 
 ---
 
-## Annexe 1 — GitHub Actions Runner
-
-<!-- Captures d'écran du runner CI/CD -->
-
----
-
-## Annexe 2 — Tests
+## Annexe — Tests
 
 Les tests unitaires/d'intégration sont exécutés dans les conteneurs avec `pytest`.
 
