@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: self-hosted
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Creer fichier .env
+        run: |
+          echo "DB_HOST=mysql" > .env
+          echo "DB_PORT=3306" >> .env
+          echo "DB_NAME=labo05_db" >> .env
+          echo "DB_USER=labo05" >> .env
+          echo "DB_PASSWORD=labo05" >> .env
+          echo "REDIS_HOST=redis" >> .env
+          echo "REDIS_PORT=6379" >> .env
+          echo "REDIS_DB=0" >> .env
+
+      - name: Creer le reseau Docker
+        run: docker network create labo05-network || true
+
+      - name: Build et demarrage des conteneurs
+        run: docker compose up -d --build
+
+      - name: Attendre que MySQL soit pret
+        run: |
+          for i in $(seq 1 30); do
+            if docker compose exec -T mysql mysqladmin ping -h localhost -u root -proot --silent; then
+              echo "MySQL pret"; exit 0
+            fi
+            echo "Attente de MySQL... ($i)"; sleep 2
+          done
+          echo "MySQL n'a pas demarre a temps"; exit 1
+
+      - name: Run tests
+        run: docker compose exec -T store_manager pytest -v
+
+      - name: Arret des conteneurs
+        if: always()
+        run: docker compose down

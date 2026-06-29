@@ -1,0 +1,7 @@
+# Use this workspace to collaborate
+workspace:
+  id: a4bc33ed-2dd1-4212-887a-0b9f44700b26
+
+localResources:
+  collections:
+    - ..\store_manager.json
